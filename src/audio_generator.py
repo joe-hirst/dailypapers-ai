@@ -7,30 +7,27 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from src.settings import Settings
-
 logger = logging.getLogger(__name__)
 
 
-def save_binary_file(file_name: str, data: bytes) -> None:
+def save_binary_file(output_file_path: Path, data: bytes) -> None:
     """Saves binary data to a specified file."""
     logger.info("Saving to disk")
-    with Path("data", file_name).open("wb") as f:
+    with output_file_path.open("wb") as f:
         f.write(data)
-    logger.info("File saved to: %s", file_name)
+    logger.info("File saved to: %s", output_file_path)
 
 
-def generate_audio_from_script(settings: Settings) -> None:
+def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_key: str) -> Path:
     """Generates audio from a transcript using a given audio model."""
-    script = Path("data", "transcript.txt").read_text()
     logger.info("Generating TTS")
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=gemini_api_key)
 
     contents = [
         types.Content(
             role="user",
             parts=[
-                types.Part.from_text(text=script),
+                types.Part.from_text(text=podcast_script),
             ],
         ),
     ]
@@ -63,9 +60,9 @@ def generate_audio_from_script(settings: Settings) -> None:
         ),
     )
 
-    file_index = 0
+    output_file_path = Path("data", "podcast.wav")
     for chunk in client.models.generate_content_stream(
-        model=settings.tts_model,
+        model=tts_model,
         contents=contents,
         config=generate_content_config,
     ):
@@ -73,9 +70,6 @@ def generate_audio_from_script(settings: Settings) -> None:
             continue
         inline_data = chunk.candidates[0].content.parts[0].inline_data
         if inline_data and inline_data.data:
-            file_name_prefix = f"podcast_{file_index}"
-            file_index += 1
-
             file_extension = mimetypes.guess_extension(inline_data.mime_type or "")
             data_buffer = inline_data.data
 
@@ -86,9 +80,11 @@ def generate_audio_from_script(settings: Settings) -> None:
                 else:
                     logger.warning("MIME type is missing for audio data, cannot convert to WAV without it.")
                     continue
-            save_binary_file(f"{file_name_prefix}{file_extension}", data_buffer)
+            save_binary_file(output_file_path, data_buffer)
         elif chunk.text:
             logger.info(chunk.text)
+
+    return output_file_path
 
 
 def convert_to_wav(audio_data: bytes, mime_type: str) -> bytes:

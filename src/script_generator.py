@@ -4,14 +4,11 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from src.settings import Settings
-
 logger = logging.getLogger(__name__)
 
 
-def generate_script_from_paper(settings: Settings) -> None:
+def generate_script_from_paper(paper_path: str, script_model: str, gemini_api_key: str) -> str | None:
     logger.info("Making script")
-    paper_path = Path("data", "papers", "2506.03095v1.pdf")
     prompt = """
         Write a podcast script for this paper.
         The podcast should be around 8-10 minutes.
@@ -24,14 +21,14 @@ def generate_script_from_paper(settings: Settings) -> None:
         Make sure you explain all the concepts and make the podcast accessible to a wide audience.
         """
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=gemini_api_key)
 
     contents = [
         types.Content(
             role="user",
             parts=[
                 types.Part.from_text(text=prompt),
-                types.Part.from_bytes(data=paper_path.read_bytes(), mime_type="application/pdf"),
+                types.Part.from_bytes(data=Path(paper_path).read_bytes(), mime_type="application/pdf"),
             ],
         ),
     ]
@@ -41,11 +38,10 @@ def generate_script_from_paper(settings: Settings) -> None:
         response_mime_type="text/plain",
     )
     response = client.models.generate_content(
-        model=settings.script_model,
+        model=script_model,
         contents=contents,
         config=generate_content_config,
     )
 
     logger.info("Saving transcript")
-    if response.text is not None:
-        Path("data", "transcript.txt").write_text(response.text)
+    return response.text
