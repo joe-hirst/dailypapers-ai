@@ -1,0 +1,24 @@
+[project]
+name = "gemini-tts"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-genai>=1.18.0",
+    "librosa>=0.11.0",
+    "python-dotenv>=1.1.0",
+    "soundfile>=0.13.1",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.11.12"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 165
+fix = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "D"]
