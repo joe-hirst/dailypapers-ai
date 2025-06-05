@@ -1,7 +1,7 @@
 import logging
 
-from src.make_audio import make_audio
-from src.make_script import make_script
+from src.audio_generator import generate_audio_from_script
+from src.script_generator import generate_script_from_paper
 
 logging.basicConfig(
     level=logging.INFO,
@@ -10,12 +10,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
-    logger.info("Making script")
-    make_script(script_model="gemini-2.5-pro-preview-05-06")
-    logger.info("Making audio")
-    make_audio(audio_model="gemini-2.5-pro-preview-tts")
+def podcast_generation_pipeline() -> None:
+    generate_script_from_paper(script_model="gemini-2.5-pro-preview-06-05")
+    generate_audio_from_script(audio_model="gemini-2.5-pro-preview-tts")
 
 
 if __name__ == "__main__":
-    main()
+    podcast_generation_pipeline()

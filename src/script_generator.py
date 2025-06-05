@@ -11,7 +11,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-def make_script(script_model: str = "gemini-2.5-pro-preview-05-06") -> None:
+def generate_script_from_paper(script_model: str = "gemini-2.5-pro-preview-05-06") -> None:
     logger.info("Making script")
     paper_path = Path("data", "papers", "2506.03095v1.pdf")
     prompt = """
@@ -52,8 +52,8 @@ def make_script(script_model: str = "gemini-2.5-pro-preview-05-06") -> None:
 
     logger.info("Saving transcript")
     if response.text is not None:
-        Path("transcript.txt").write_text(response.text)
+        Path("data", "transcript.txt").write_text(response.text)
 
 
 if __name__ == "__main__":
-    make_script()
+    generate_script_from_paper()
