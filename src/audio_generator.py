@@ -1,15 +1,13 @@
 import logging
 import mimetypes
-import os
 import struct
 from contextlib import suppress
 from pathlib import Path
 
-from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-load_dotenv()
+from src.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +20,11 @@ def save_binary_file(file_name: str, data: bytes) -> None:
     logger.info("File saved to: %s", file_name)
 
 
-def generate_audio_from_script(audio_model: str = "gemini-2.5-pro-preview-tts") -> None:
+def generate_audio_from_script(settings: Settings) -> None:
     """Generates audio from a transcript using a given audio model."""
     script = Path("data", "transcript.txt").read_text()
     logger.info("Generating TTS")
-    client = genai.Client(
-        api_key=os.environ.get("GEMINI_API_KEY"),
-    )
+    client = genai.Client(api_key=settings.gemini_api_key)
 
     contents = [
         types.Content(
@@ -69,7 +65,7 @@ def generate_audio_from_script(audio_model: str = "gemini-2.5-pro-preview-tts") 
 
     file_index = 0
     for chunk in client.models.generate_content_stream(
-        model=audio_model,
+        model=settings.tts_model,
         contents=contents,
         config=generate_content_config,
     ):
@@ -156,7 +152,3 @@ def parse_audio_mime_type(mime_type: str) -> dict[str, int | None]:
                 bits_per_sample = int(param_stripped.split("L", 1)[1])
 
     return {"bits_per_sample": bits_per_sample, "rate": rate}
-
-
-if __name__ == "__main__":
-    generate_audio_from_script()

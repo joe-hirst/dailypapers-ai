@@ -1,17 +1,15 @@
 import logging
-import os
 from pathlib import Path
 
-from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-load_dotenv()
+from src.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 
-def generate_script_from_paper(script_model: str = "gemini-2.5-pro-preview-05-06") -> None:
+def generate_script_from_paper(settings: Settings) -> None:
     logger.info("Making script")
     paper_path = Path("data", "papers", "2506.03095v1.pdf")
     prompt = """
@@ -26,9 +24,7 @@ def generate_script_from_paper(script_model: str = "gemini-2.5-pro-preview-05-06
         Make sure you explain all the concepts and make the podcast accessible to a wide audience.
         """
 
-    client = genai.Client(
-        api_key=os.environ.get("GEMINI_API_KEY"),
-    )
+    client = genai.Client(api_key=settings.gemini_api_key)
 
     contents = [
         types.Content(
@@ -45,7 +41,7 @@ def generate_script_from_paper(script_model: str = "gemini-2.5-pro-preview-05-06
         response_mime_type="text/plain",
     )
     response = client.models.generate_content(
-        model=script_model,
+        model=settings.script_model,
         contents=contents,
         config=generate_content_config,
     )
@@ -53,7 +49,3 @@ def generate_script_from_paper(script_model: str = "gemini-2.5-pro-preview-05-06
     logger.info("Saving transcript")
     if response.text is not None:
         Path("data", "transcript.txt").write_text(response.text)
-
-
-if __name__ == "__main__":
-    generate_script_from_paper()

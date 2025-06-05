@@ -2,18 +2,21 @@ import logging
 
 from src.audio_generator import generate_audio_from_script
 from src.script_generator import generate_script_from_paper
+from src.settings import Settings, get_settings
+
+settings = get_settings()
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=settings.log_level,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
-def podcast_generation_pipeline() -> None:
-    generate_script_from_paper(script_model="gemini-2.5-pro-preview-06-05")
-    generate_audio_from_script(audio_model="gemini-2.5-pro-preview-tts")
+def podcast_generation_pipeline(settings: Settings) -> None:
+    generate_script_from_paper(settings=settings)
+    generate_audio_from_script(settings=settings)
 
 
 if __name__ == "__main__":
-    podcast_generation_pipeline()
+    podcast_generation_pipeline(settings=settings)
