@@ -1,6 +1,6 @@
 import logging
-import mimetypes
-import subprocess
+import struct
+from contextlib import suppress
 from pathlib import Path
 
 from google import genai
@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 def _save_binary_data(output_file_path: Path, data: bytes) -> None:
-    """Saves binary data to a specified file."""
     logger.info("Saving binary data to: %s", output_file_path)
     output_file_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -19,46 +18,59 @@ def _save_binary_data(output_file_path: Path, data: bytes) -> None:
     except OSError:
         logger.exception("Failed to save file %s.", output_file_path)
         raise
-
     logger.info("File saved successfully: %s", output_file_path)
 
 
-def _convert_audio_with_ffmpeg(input_path: Path, output_path: Path, output_format: str) -> Path:
-    """Converts an audio file to a specified format using FFmpeg."""
-    logger.info("Converting %s to %s format...", input_path.name, output_format)
-    command = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(input_path),
-        "-acodec",
-        output_format,
-        str(output_path),
-    ]
-    try:
-        subprocess.run(command, capture_output=True, text=True, check=True)  # noqa: S603
-    except subprocess.CalledProcessError as e:
-        logger.exception("FFmpeg conversion failed: Command: '%s'", " ".join(e.cmd))
-        error_msg = f"FFmpeg conversion failed: {e.stderr}"
-        raise RuntimeError(error_msg) from e
-    except FileNotFoundError as e:
-        logger.exception("FFmpeg command not found. Is FFmpeg installed and in your PATH?")
-        error_msg = "FFmpeg is not installed or not in system PATH."
-        raise RuntimeError(error_msg) from e
-    except Exception as e:
-        logger.exception("An unexpected error occurred during FFmpeg conversion.")
-        error_msg = f"An unexpected error occurred during FFmpeg conversion: {e}"
-        raise RuntimeError(error_msg) from e
-    else:
-        logger.info("Successfully converted audio to: %s", output_path)
-        return output_path
+def _parse_audio_mime_type(mime_type: str) -> dict[str, int]:
+    bits_per_sample: int = 16
+    rate: int = 24000
+    parts = mime_type.split(";")
+    for part in parts:
+        stripped_part = part.strip()
+        if stripped_part.lower().startswith("rate="):
+            with suppress(ValueError, IndexError):
+                rate_str = stripped_part.split("=", 1)[1]
+                rate = int(rate_str)
+        elif stripped_part.startswith("audio/L"):
+            with suppress(ValueError, IndexError):
+                bits_per_sample = int(stripped_part.split("L", 1)[1])
+    return {"bits_per_sample": bits_per_sample, "rate": rate}
+
+
+def _convert_to_wav(audio_data: bytes, mime_type: str) -> bytes:
+    parameters = _parse_audio_mime_type(mime_type)
+    bits_per_sample: int = parameters.get("bits_per_sample", 16)
+    sample_rate: int = parameters.get("rate", 24000)
+
+    num_channels = 1
+    data_size = len(audio_data)
+    bytes_per_sample = bits_per_sample // 8
+    block_align = num_channels * bytes_per_sample
+    byte_rate = sample_rate * block_align
+    chunk_size = 36 + data_size
+
+    header = struct.pack(
+        "<4sI4s4sIHHIIHH4sI",
+        b"RIFF",
+        chunk_size,
+        b"WAVE",
+        b"fmt ",
+        16,
+        1,
+        num_channels,
+        sample_rate,
+        byte_rate,
+        block_align,
+        bits_per_sample,
+        b"data",
+        data_size,
+    )
+    return header + audio_data
 
 
 def _process_audio_stream(tts_model: str, contents: list[types.Content], config: types.GenerateContentConfig, gemini_api_key: str) -> tuple[bytes, str | None]:
-    """Processes the audio stream from the Gemini API, accumulating data and MIME type."""
     full_audio_data = b""
     received_mime_type: str | None = None
-
     client = genai.Client(api_key=gemini_api_key)
 
     for chunk in client.models.generate_content_stream(model=tts_model, contents=contents, config=config):
@@ -75,12 +87,10 @@ def _process_audio_stream(tts_model: str, contents: list[types.Content], config:
 
     if not full_audio_data:
         logger.error("No audio data was received from the TTS model.")
-
     return full_audio_data, received_mime_type
 
 
 def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_key: str) -> Path:
-    """Generates audio from a podcast script using the specified TTS model."""
     logger.info("Starting text-to-speech generation...")
 
     contents = [
@@ -96,10 +106,12 @@ def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_k
             multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
                 speaker_voice_configs=[
                     types.SpeakerVoiceConfig(
-                        speaker="Speaker 1", voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Leda"))
+                        speaker="Speaker 1",
+                        voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Leda")),
                     ),
                     types.SpeakerVoiceConfig(
-                        speaker="Speaker 2", voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck"))
+                        speaker="Speaker 2",
+                        voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck")),
                     ),
                 ],
             ),
@@ -107,7 +119,6 @@ def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_k
     )
 
     data_dir = Path("data")
-    temp_raw_audio_path = data_dir / "temp_raw_audio"
     final_wav_path = data_dir / "podcast.wav"
 
     try:
@@ -116,28 +127,15 @@ def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_k
         if not full_audio_data:
             return Path()
 
-        if received_mime_type:
-            ext = mimetypes.guess_extension(received_mime_type)
-            if ext:
-                temp_raw_audio_path = temp_raw_audio_path.with_suffix(ext)
-            else:
-                logger.warning("Could not guess file extension for MIME type: %s. Saving as .bin.", received_mime_type)
-                temp_raw_audio_path = temp_raw_audio_path.with_suffix(".bin")
-        else:
-            logger.warning("No MIME type provided for audio data. Saving as .bin.")
-            temp_raw_audio_path = temp_raw_audio_path.with_suffix(".bin")
-
-        _save_binary_data(temp_raw_audio_path, full_audio_data)
-
-        if temp_raw_audio_path.suffix.lower() == ".wav":
-            temp_raw_audio_path.rename(final_wav_path)
-            logger.info("Audio was already WAV, moved to: %s", final_wav_path)
-        else:
-            _convert_audio_with_ffmpeg(temp_raw_audio_path, final_wav_path, "pcm_s16le")
-            temp_raw_audio_path.unlink(missing_ok=True)
-
+        if received_mime_type and not received_mime_type.lower().startswith("audio/wav"):
+            full_audio_data = _convert_to_wav(full_audio_data, received_mime_type)
+            logger.info("Converted received audio to WAV format.")
+        elif not received_mime_type:
+            logger.warning("No MIME type provided for audio data. Assuming default and attempting WAV conversion.")
+            full_audio_data = _convert_to_wav(full_audio_data, "audio/L16;rate=24000")
     except Exception:
         logger.exception("Error during audio generation pipeline.")
         return Path()
     else:
+        _save_binary_data(final_wav_path, full_audio_data)
         return final_wav_path
