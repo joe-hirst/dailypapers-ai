@@ -1,7 +1,7 @@
 [project]
-name = "Daily Papers Podcast"
+name = "daily-papers-podcast"
 version = "0.1.0"
-description = "Pipeline for automatically generating podcasts about Arxiv papers"
+description = "Automatically generate podcasts about Arxiv papers with Google Gemini and Text-to-Speach "
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

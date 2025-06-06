@@ -1,7 +1,6 @@
 import logging
 import mimetypes
-import struct
-from contextlib import suppress
+import subprocess
 from pathlib import Path
 
 from google import genai
@@ -10,141 +9,135 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 
-def save_binary_file(output_file_path: Path, data: bytes) -> None:
+def _save_binary_data(output_file_path: Path, data: bytes) -> None:
     """Saves binary data to a specified file."""
-    logger.info("Saving to disk")
-    with output_file_path.open("wb") as f:
-        f.write(data)
-    logger.info("File saved to: %s", output_file_path)
+    logger.info("Saving binary data to: %s", output_file_path)
+    output_file_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with output_file_path.open("wb") as f:
+            f.write(data)
+    except OSError:
+        logger.exception("Failed to save file %s.", output_file_path)
+        raise
+
+    logger.info("File saved successfully: %s", output_file_path)
+
+
+def _convert_audio_with_ffmpeg(input_path: Path, output_path: Path, output_format: str) -> Path:
+    """Converts an audio file to a specified format using FFmpeg."""
+    logger.info("Converting %s to %s format...", input_path.name, output_format)
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_path),
+        "-acodec",
+        output_format,
+        str(output_path),
+    ]
+    try:
+        subprocess.run(command, capture_output=True, text=True, check=True)  # noqa: S603
+    except subprocess.CalledProcessError as e:
+        logger.exception("FFmpeg conversion failed: Command: '%s'", " ".join(e.cmd))
+        error_msg = f"FFmpeg conversion failed: {e.stderr}"
+        raise RuntimeError(error_msg) from e
+    except FileNotFoundError as e:
+        logger.exception("FFmpeg command not found. Is FFmpeg installed and in your PATH?")
+        error_msg = "FFmpeg is not installed or not in system PATH."
+        raise RuntimeError(error_msg) from e
+    except Exception as e:
+        logger.exception("An unexpected error occurred during FFmpeg conversion.")
+        error_msg = f"An unexpected error occurred during FFmpeg conversion: {e}"
+        raise RuntimeError(error_msg) from e
+    else:
+        logger.info("Successfully converted audio to: %s", output_path)
+        return output_path
+
+
+def _process_audio_stream(tts_model: str, contents: list[types.Content], config: types.GenerateContentConfig, gemini_api_key: str) -> tuple[bytes, str | None]:
+    """Processes the audio stream from the Gemini API, accumulating data and MIME type."""
+    full_audio_data = b""
+    received_mime_type: str | None = None
+
+    client = genai.Client(api_key=gemini_api_key)
+
+    for chunk in client.models.generate_content_stream(model=tts_model, contents=contents, config=config):
+        if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+            inline_data = chunk.candidates[0].content.parts[0].inline_data
+            if inline_data and inline_data.data:
+                full_audio_data += inline_data.data
+                if received_mime_type is None:
+                    received_mime_type = inline_data.mime_type
+            elif chunk.text:
+                logger.info(chunk.text)
+        else:
+            logger.debug("Skipping empty or malformed chunk.")
+
+    if not full_audio_data:
+        logger.error("No audio data was received from the TTS model.")
+
+    return full_audio_data, received_mime_type
 
 
 def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_key: str) -> Path:
-    """Generates audio from a transcript using a given audio model."""
-    logger.info("Generating TTS")
-    client = genai.Client(api_key=gemini_api_key)
+    """Generates audio from a podcast script using the specified TTS model."""
+    logger.info("Starting text-to-speech generation...")
 
     contents = [
         types.Content(
             role="user",
-            parts=[
-                types.Part.from_text(text=podcast_script),
-            ],
+            parts=[types.Part.from_text(text=podcast_script)],
         ),
     ]
     generate_content_config = types.GenerateContentConfig(
         temperature=1,
-        response_modalities=[
-            "audio",
-        ],
+        response_modalities=["audio"],
         speech_config=types.SpeechConfig(
             multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
                 speaker_voice_configs=[
                     types.SpeakerVoiceConfig(
-                        speaker="Speaker 1",
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name="Leda",
-                            ),
-                        ),
+                        speaker="Speaker 1", voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Leda"))
                     ),
                     types.SpeakerVoiceConfig(
-                        speaker="Speaker 2",
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name="Puck",
-                            ),
-                        ),
+                        speaker="Speaker 2", voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck"))
                     ),
                 ],
             ),
         ),
     )
 
-    output_file_path = Path("data", "podcast.wav")
-    for chunk in client.models.generate_content_stream(
-        model=tts_model,
-        contents=contents,
-        config=generate_content_config,
-    ):
-        if chunk.candidates is None or chunk.candidates[0].content is None or chunk.candidates[0].content.parts is None:
-            continue
-        inline_data = chunk.candidates[0].content.parts[0].inline_data
-        if inline_data and inline_data.data:
-            file_extension = mimetypes.guess_extension(inline_data.mime_type or "")
-            data_buffer = inline_data.data
+    data_dir = Path("data")
+    temp_raw_audio_path = data_dir / "temp_raw_audio"
+    final_wav_path = data_dir / "podcast.wav"
 
-            if file_extension is None:
-                file_extension = ".wav"
-                if inline_data.mime_type:
-                    data_buffer = convert_to_wav(inline_data.data, inline_data.mime_type)
-                else:
-                    logger.warning("MIME type is missing for audio data, cannot convert to WAV without it.")
-                    continue
-            save_binary_file(output_file_path, data_buffer)
-        elif chunk.text:
-            logger.info(chunk.text)
+    try:
+        full_audio_data, received_mime_type = _process_audio_stream(tts_model, contents, generate_content_config, gemini_api_key)
 
-    return output_file_path
+        if not full_audio_data:
+            return Path()
 
+        if received_mime_type:
+            ext = mimetypes.guess_extension(received_mime_type)
+            if ext:
+                temp_raw_audio_path = temp_raw_audio_path.with_suffix(ext)
+            else:
+                logger.warning("Could not guess file extension for MIME type: %s. Saving as .bin.", received_mime_type)
+                temp_raw_audio_path = temp_raw_audio_path.with_suffix(".bin")
+        else:
+            logger.warning("No MIME type provided for audio data. Saving as .bin.")
+            temp_raw_audio_path = temp_raw_audio_path.with_suffix(".bin")
 
-def convert_to_wav(audio_data: bytes, mime_type: str) -> bytes:
-    """Generates a WAV file header for the given audio data and parameters."""
-    logger.info("Converting to wav")
-    parameters = parse_audio_mime_type(mime_type)
+        _save_binary_data(temp_raw_audio_path, full_audio_data)
 
-    bits_per_sample = parameters.get("bits_per_sample", 16)
-    sample_rate = parameters.get("rate", 24000)
+        if temp_raw_audio_path.suffix.lower() == ".wav":
+            temp_raw_audio_path.rename(final_wav_path)
+            logger.info("Audio was already WAV, moved to: %s", final_wav_path)
+        else:
+            _convert_audio_with_ffmpeg(temp_raw_audio_path, final_wav_path, "pcm_s16le")
+            temp_raw_audio_path.unlink(missing_ok=True)
 
-    num_channels = 1
-    data_size = len(audio_data)
-
-    if bits_per_sample is None:
-        logger.error("bits_per_sample is None, cannot calculate bytes_per_sample.")
-        return b""
-
-    bytes_per_sample = bits_per_sample // 8
-    block_align = num_channels * bytes_per_sample
-
-    if sample_rate is None:
-        logger.error("sample_rate is None, cannot calculate byte_rate.")
-        return b""
-
-    byte_rate = sample_rate * block_align
-    chunk_size = 36 + data_size
-
-    header = struct.pack(
-        "<4sI4s4sIHHIIHH4sI",
-        b"RIFF",
-        chunk_size,
-        b"WAVE",
-        b"fmt ",
-        16,
-        1,
-        num_channels,
-        sample_rate,
-        byte_rate,
-        block_align,
-        bits_per_sample,
-        b"data",
-        data_size,
-    )
-    return header + audio_data
-
-
-def parse_audio_mime_type(mime_type: str) -> dict[str, int | None]:
-    """Parses bits per sample and rate from an audio MIME type string."""
-    logger.info("Parsing audio MIME type")
-    bits_per_sample: int | None = 16
-    rate: int | None = 24000
-
-    parts = mime_type.split(";")
-    for original_param_str in parts:
-        param_stripped = original_param_str.strip()
-        if param_stripped.lower().startswith("rate="):
-            with suppress(ValueError, IndexError):
-                rate = int(param_stripped.split("=", 1)[1])
-        elif param_stripped.startswith("audio/L"):
-            with suppress(ValueError, IndexError):
-                bits_per_sample = int(param_stripped.split("L", 1)[1])
-
-    return {"bits_per_sample": bits_per_sample, "rate": rate}
+    except Exception:
+        logger.exception("Error during audio generation pipeline.")
+        return Path()
+    else:
+        return final_wav_path
