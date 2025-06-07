@@ -7,14 +7,18 @@ logger = logging.getLogger(__name__)
 
 def compose_final_podcast_video(input_wav_path: Path, output_mp4_path: Path, background_image: Path) -> None:
     """Composes the final podcast video from an audio file and a background image."""
+    logger.info("Starting video composition: %s -> %s", input_wav_path.name, output_mp4_path.name)
+
     output_mp3_path = input_wav_path.with_suffix(".mp3")
     mp3_path = convert_wav_to_mp3(input_wav_path=input_wav_path, output_mp3_path=output_mp3_path)
     create_video_from_mp3_and_image(input_mp3_path=mp3_path, output_mp4_path=output_mp4_path, background_image=background_image)
 
+    logger.info("Video composition completed successfully")
+
 
 def convert_wav_to_mp3(input_wav_path: Path, output_mp3_path: Path) -> Path:
     """Converts a WAV audio file to MP3 format using FFmpeg."""
-    logger.info("Converting wav to mp3")
+    logger.info("Converting %s to MP3 format", input_wav_path.name)
     command = [
         "ffmpeg",
         "-y",
@@ -48,7 +52,7 @@ def convert_wav_to_mp3(input_wav_path: Path, output_mp3_path: Path) -> Path:
 
 def create_video_from_mp3_and_image(input_mp3_path: Path, output_mp4_path: Path, background_image: Path) -> None:
     """Creates an MP4 video from an MP3 audio file and a static background image using FFmpeg."""
-    logger.info("Creating mp4 file")
+    logger.info("Creating MP4 video from %s and %s", input_mp3_path.name, background_image.name)
     command = [
         "ffmpeg",
         "-y",
