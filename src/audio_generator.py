@@ -90,7 +90,7 @@ def _process_audio_stream(tts_model: str, contents: list[types.Content], config:
     return full_audio_data, received_mime_type
 
 
-def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_key: str) -> Path:
+def generate_audio_from_script(podcast_script: str, output_wav_path: Path, tts_model: str, gemini_api_key: str) -> None:
     logger.info("Starting text-to-speech generation...")
 
     contents = [
@@ -118,14 +118,11 @@ def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_k
         ),
     )
 
-    data_dir = Path("data")
-    final_wav_path = data_dir / "podcast.wav"
-
     try:
         full_audio_data, received_mime_type = _process_audio_stream(tts_model, contents, generate_content_config, gemini_api_key)
 
         if not full_audio_data:
-            return Path()
+            return
 
         if received_mime_type and not received_mime_type.lower().startswith("audio/wav"):
             full_audio_data = _convert_to_wav(full_audio_data, received_mime_type)
@@ -135,7 +132,5 @@ def generate_audio_from_script(podcast_script: str, tts_model: str, gemini_api_k
             full_audio_data = _convert_to_wav(full_audio_data, "audio/L16;rate=24000")
     except Exception:
         logger.exception("Error during audio generation pipeline.")
-        return Path()
     else:
-        _save_binary_data(final_wav_path, full_audio_data)
-        return final_wav_path
+        _save_binary_data(output_file_path=output_wav_path, data=full_audio_data)

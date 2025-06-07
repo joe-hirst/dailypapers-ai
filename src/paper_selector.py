@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import date
+from pathlib import Path
 
 import arxiv
 from google import genai
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str] | None:
     """Fetches a list of AI papers from arXiv for a specific date."""
+    logger.info("Fetching AI papers for date: %s (max: %d)", target_date.isoformat(), max_results)
     client = arxiv.Client()
 
     # Query for AI papers (cat:cs.AI) submitted on the target date
@@ -28,6 +30,7 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
         logger.warning("No AI papers found for %s", target_date.isoformat())
         return None
 
+    logger.info("Found %d AI papers for %s", len(results), target_date.isoformat())  # Add this
     return [
         f"""
         Title: {paper.title}
@@ -41,6 +44,8 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
 
 
 def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str, gemini_api_key: str) -> str | None:
+    logger.info("Selecting best paper from %d candidates using model: %s", len(papers_with_abstracts), gemini_model)
+
     prompt = f"""
     Take a look at the following papers. Select the ""best"" one to be discussed on the Daily Papers podcast.
     Return the pdf_url only.
@@ -70,7 +75,9 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str
     return response.text
 
 
-def download_arxiv_pdf_from_url(pdf_url: str) -> None:
+def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
+    logger.info("Attempting to download paper from URL: %s", pdf_url)
+
     # 1. Extract the arXiv ID from the PDF URL
     match = re.search(r"arxiv\.org/pdf/(\d{4}\.\d{5}(?:v\d+)?)", pdf_url)
     if not match:
@@ -86,21 +93,27 @@ def download_arxiv_pdf_from_url(pdf_url: str) -> None:
         search = arxiv.Search(id_list=[arxiv_id])
         paper = next(client.results(search), None)
         if paper:
-            filepath = paper.download_pdf(dirpath="data", filename="paper.pdf")
+            filepath = paper.download_pdf(dirpath=str(output_paper_path.parent), filename=output_paper_path.name)
             logger.info("Downloaded %s to %s", paper.title, filepath)
             logger.info("Paper was submitted on %s", paper.published.date)
         else:
-            logger.warning("No paper found for arXiv ID: %s", arxiv_id)
+            logger.error("No paper found for arXiv ID: %s", arxiv_id)
 
     except Exception:
-        logger.exception("An error occurred")
+        logger.exception("Failed to download paper from arXiv ID: %s", arxiv_id)
 
 
-def find_and_download_paper(date: date, gemini_model: str, gemini_api_key: str) -> None:
+def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> None:
+    logger.info("Starting paper selection and download process for %s", date.isoformat())
+
     papers_with_abstracts = get_abstracts_for_day(date)
     if not papers_with_abstracts:
+        logger.warning("No papers found for date %s, skipping paper selection", date.isoformat())
         return
+
     best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, gemini_model=gemini_model, gemini_api_key=gemini_api_key)
     if not best_paper:
+        logger.error("Failed to select best paper from available candidates")
         return
-    download_arxiv_pdf_from_url(pdf_url=best_paper)
+
+    download_arxiv_pdf_from_url(pdf_url=best_paper, output_paper_path=output_paper_path)

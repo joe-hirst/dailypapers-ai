@@ -31,39 +31,47 @@ def podcast_generation_pipeline(settings: Settings) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        # 1. Select best paper for day
         yesterday = datetime.now(tz=UTC) - timedelta(days=2)
-        find_and_download_paper(date=yesterday, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
         paper_path = data_dir / "paper.pdf"
+        find_and_download_paper(date=yesterday, output_paper_path=paper_path, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
 
         if not paper_path.exists():
             logger.critical("Paper not found at %s. Ensure the path is correct and the file exists.", paper_path)
             sys.exit(1)
 
-        # 1. Generate podcast script
+        # 2. Generate podcast script
         logger.info("Generating podcast script from paper: %s", paper_path)
         podcast_script = generate_script_from_paper(paper_path=paper_path, script_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
 
         if not podcast_script:
             logger.critical("Failed to generate podcast script. Script content was empty.")
             sys.exit(1)
+        # Save script for reference
+        script_path = data_dir / "podcast_script.txt"
+        script_path.write_text(podcast_script)
         logger.info("Podcast script generated successfully.")
 
-        # 2. Generate audio from the script
+        # 3. Generate audio from the script
         logger.info("Generating audio from the podcast script.")
-        audio_wav_path = generate_audio_from_script(podcast_script=podcast_script, tts_model=settings.tts_model, gemini_api_key=settings.gemini_api_key)
+        audio_wav_path = data_dir / "podcast.wav"
+        generate_audio_from_script(
+            podcast_script=podcast_script, output_wav_path=audio_wav_path, tts_model=settings.tts_model, gemini_api_key=settings.gemini_api_key
+        )
 
         if not audio_wav_path.exists():
             logger.critical("Audio generation failed: Output file does not exist.")
             sys.exit(1)
         logger.info("Audio generated successfully: %s", audio_wav_path)
 
-        # 3. Compose the final video
+        # 4. Compose the final video
         logger.info("Composing the final podcast video.")
-        compose_final_podcast_video(audio_wav_path=audio_wav_path, background_image=background_image_path)
+        video_mp4_path = data_dir / "podcast.mp4"
+        compose_final_podcast_video(input_wav_path=audio_wav_path, output_mp4_path=video_mp4_path, background_image=background_image_path)
         logger.info("Podcast video composed successfully.")
 
-    except Exception as e:  # noqa: BLE001
-        logger.critical("An unexpected error occurred during the podcast generation pipeline: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("An unexpected error occurred during the podcast generation pipeline")
         sys.exit(1)
     else:
         logger.info("Podcast generation pipeline completed successfully.")

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_key: str) -> str | None:
     """Generates a podcast script from a research paper using a Gemini model."""
-    logger.info("Starting script generation from paper: %s", paper_path.name)
+    logger.info("Starting script generation from paper: %s using model: %s", paper_path.name, script_model)
 
     prompt = """
     Write a podcast script for this paper.
@@ -60,6 +60,5 @@ def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_k
         logger.exception("Failed to generate script for paper '%s'. An error occurred.", paper_path.name)
         return None
     else:
-        logger.info("Script generation complete for paper: %s", paper_path.name)
-        Path("data", "script.txt").write_text(podcast_script)
+        logger.info("Script generation complete for paper: %s (%d characters)", paper_path.name, len(podcast_script))
         return podcast_script

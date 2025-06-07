@@ -5,16 +5,16 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def compose_final_podcast_video(audio_wav_path: Path, background_image: Path) -> None:
+def compose_final_podcast_video(input_wav_path: Path, output_mp4_path: Path, background_image: Path) -> None:
     """Composes the final podcast video from an audio file and a background image."""
-    mp3_path = convert_wav_to_mp3(input_wav_path=audio_wav_path)
-    create_video_from_mp3_and_image(input_mp3_path=mp3_path, background_image=background_image)
+    output_mp3_path = input_wav_path.with_suffix(".mp3")
+    mp3_path = convert_wav_to_mp3(input_wav_path=input_wav_path, output_mp3_path=output_mp3_path)
+    create_video_from_mp3_and_image(input_mp3_path=mp3_path, output_mp4_path=output_mp4_path, background_image=background_image)
 
 
-def convert_wav_to_mp3(input_wav_path: Path) -> Path:
+def convert_wav_to_mp3(input_wav_path: Path, output_mp3_path: Path) -> Path:
     """Converts a WAV audio file to MP3 format using FFmpeg."""
     logger.info("Converting wav to mp3")
-    output_mp3_path = input_wav_path.with_suffix(".mp3")
     command = [
         "ffmpeg",
         "-y",
@@ -46,10 +46,9 @@ def convert_wav_to_mp3(input_wav_path: Path) -> Path:
         return output_mp3_path
 
 
-def create_video_from_mp3_and_image(input_mp3_path: Path, background_image: Path) -> None:
+def create_video_from_mp3_and_image(input_mp3_path: Path, output_mp4_path: Path, background_image: Path) -> None:
     """Creates an MP4 video from an MP3 audio file and a static background image using FFmpeg."""
     logger.info("Creating mp4 file")
-    output_video_path = Path("data", "podcast.mp4")
     command = [
         "ffmpeg",
         "-y",
@@ -66,7 +65,7 @@ def create_video_from_mp3_and_image(input_mp3_path: Path, background_image: Path
         "-shortest",
         "-pix_fmt",
         "yuv420p",
-        str(output_video_path),
+        str(output_mp4_path),
     ]
     try:
         subprocess.run(command, capture_output=True, text=True, check=True)  # noqa: S603
@@ -83,4 +82,4 @@ def create_video_from_mp3_and_image(input_mp3_path: Path, background_image: Path
         error_msg = f"An unexpected error occurred during FFmpeg MP4 creation: {e}"
         raise RuntimeError(error_msg) from e
     else:
-        logger.info("Successfully created MP4 video: %s", output_video_path)
+        logger.info("Successfully created MP4 video: %s", output_mp4_path)
