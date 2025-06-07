@@ -10,6 +10,26 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 
+def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> None:
+    """Find best paper for date and download it to specified path."""
+    logger.info("Starting paper selection and download process for %s", date.isoformat())
+
+    # 1. Get list of abstracts uploaded to Arxiv
+    papers_with_abstracts = get_abstracts_for_day(date)
+    if not papers_with_abstracts:
+        logger.warning("No papers found for date %s, skipping paper selection", date.isoformat())
+        return
+
+    # 2. Select the best paper
+    best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, gemini_model=gemini_model, gemini_api_key=gemini_api_key)
+    if not best_paper:
+        logger.error("Failed to select best paper from available candidates")
+        return
+
+    # 3. Download the best paper
+    download_arxiv_pdf_from_url(pdf_url=best_paper, output_paper_path=output_paper_path)
+
+
 def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str] | None:
     """Fetch list of AI papers from arXiv for specific date."""
     logger.info("Fetching AI papers for date: %s (max: %d)", target_date.isoformat(), max_results)
@@ -103,20 +123,3 @@ def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
 
     except Exception:
         logger.exception("Failed to download paper from arXiv ID: %s", arxiv_id)
-
-
-def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> None:
-    """Find best paper for date and download it to specified path."""
-    logger.info("Starting paper selection and download process for %s", date.isoformat())
-
-    papers_with_abstracts = get_abstracts_for_day(date)
-    if not papers_with_abstracts:
-        logger.warning("No papers found for date %s, skipping paper selection", date.isoformat())
-        return
-
-    best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, gemini_model=gemini_model, gemini_api_key=gemini_api_key)
-    if not best_paper:
-        logger.error("Failed to select best paper from available candidates")
-        return
-
-    download_arxiv_pdf_from_url(pdf_url=best_paper, output_paper_path=output_paper_path)

@@ -9,8 +9,10 @@ def compose_final_podcast_video(input_wav_path: Path, output_mp4_path: Path, bac
     """Composes the final podcast video from an audio file and a background image."""
     logger.info("Starting video composition: %s -> %s", input_wav_path.name, output_mp4_path.name)
 
+    # 1. Convert wav to mp3
     output_mp3_path = input_wav_path.with_suffix(".mp3")
     mp3_path = convert_wav_to_mp3(input_wav_path=input_wav_path, output_mp3_path=output_mp3_path)
+    # 2. Convert mp3 to mp4 video with background image
     create_video_from_mp3_and_image(input_mp3_path=mp3_path, output_mp4_path=output_mp4_path, background_image=background_image)
 
     logger.info("Video composition completed successfully")
