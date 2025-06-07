@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
     gemini_api_key: str = Field(alias="GEMINI_API_KEY")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO", alias="LOG_LEVEL")
     script_model: str = Field(alias="GEMINI_SCRIPT_MODEL")
@@ -16,4 +18,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Get cached application settings instance."""
     return Settings()  # pyright: ignore[reportCallIssue]

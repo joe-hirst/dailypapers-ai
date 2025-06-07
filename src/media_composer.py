@@ -17,7 +17,7 @@ def compose_final_podcast_video(input_wav_path: Path, output_mp4_path: Path, bac
 
 
 def convert_wav_to_mp3(input_wav_path: Path, output_mp3_path: Path) -> Path:
-    """Converts a WAV audio file to MP3 format using FFmpeg."""
+    """Convert WAV audio file to MP3 format using FFmpeg."""
     logger.info("Converting %s to MP3 format", input_wav_path.name)
     command = [
         "ffmpeg",
@@ -51,7 +51,7 @@ def convert_wav_to_mp3(input_wav_path: Path, output_mp3_path: Path) -> Path:
 
 
 def create_video_from_mp3_and_image(input_mp3_path: Path, output_mp4_path: Path, background_image: Path) -> None:
-    """Creates an MP4 video from an MP3 audio file and a static background image using FFmpeg."""
+    """Create MP4 video from MP3 audio file and static background image using FFmpeg."""
     logger.info("Creating MP4 video from %s and %s", input_mp3_path.name, background_image.name)
     command = [
         "ffmpeg",

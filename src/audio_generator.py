@@ -91,6 +91,7 @@ def _process_audio_stream(tts_model: str, contents: list[types.Content], config:
 
 
 def generate_audio_from_script(podcast_script: str, output_wav_path: Path, tts_model: str, gemini_api_key: str) -> None:
+    """Generate audio from podcast script using text-to-speech model."""
     logger.info("Starting text-to-speech generation using model: %s", tts_model)
 
     contents = [

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str] | None:
-    """Fetches a list of AI papers from arXiv for a specific date."""
+    """Fetch list of AI papers from arXiv for specific date."""
     logger.info("Fetching AI papers for date: %s (max: %d)", target_date.isoformat(), max_results)
     client = arxiv.Client()
 
@@ -44,6 +44,7 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
 
 
 def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str, gemini_api_key: str) -> str | None:
+    """Select best paper for podcast from list of abstracts using LLM."""
     logger.info("Selecting best paper from %d candidates using model: %s", len(papers_with_abstracts), gemini_model)
 
     prompt = f"""
@@ -76,6 +77,7 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str
 
 
 def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
+    """Download arXiv paper PDF from URL to specified path."""
     logger.info("Attempting to download paper from URL: %s", pdf_url)
 
     # 1. Extract the arXiv ID from the PDF URL
@@ -104,6 +106,7 @@ def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
 
 
 def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> None:
+    """Find best paper for date and download it to specified path."""
     logger.info("Starting paper selection and download process for %s", date.isoformat())
 
     papers_with_abstracts = get_abstracts_for_day(date)

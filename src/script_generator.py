@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_key: str) -> str | None:
-    """Generates a podcast script from a research paper using a Gemini model."""
+    """Generate podcast script from a research paper using a Gemini model."""
     logger.info("Starting script generation from paper: %s using model: %s", paper_path.name, script_model)
 
     prompt = """
