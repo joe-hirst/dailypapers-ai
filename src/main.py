@@ -1,6 +1,5 @@
 import logging
 import sys
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.audio_generator import generate_audio_from_script
@@ -29,12 +28,13 @@ def podcast_generation_pipeline(settings: Settings) -> None:
 
     data_dir = Path("data")
     data_dir.mkdir(parents=True, exist_ok=True)
+    target_date = settings.paper_date_parsed
+    logger.info("Fetching papers for date: %s", target_date.isoformat())
 
     try:
         # 1. Select best paper for day
-        yesterday = datetime.now(tz=UTC) - timedelta(days=2)
         paper_path = data_dir / "paper.pdf"
-        find_and_download_paper(date=yesterday, output_paper_path=paper_path, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
+        find_and_download_paper(date=target_date, output_paper_path=paper_path, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
 
         if not paper_path.exists():
             logger.critical("Paper not found at %s. Ensure the path is correct and the file exists.", paper_path)
