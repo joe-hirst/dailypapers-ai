@@ -61,4 +61,5 @@ def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_k
         return None
     else:
         logger.info("Script generation complete for paper: %s", paper_path.name)
+        Path("data", "script.txt").write_text(podcast_script)
         return podcast_script

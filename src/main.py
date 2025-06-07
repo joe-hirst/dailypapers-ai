@@ -1,9 +1,11 @@
 import logging
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.audio_generator import generate_audio_from_script
 from src.media_composer import compose_final_podcast_video
+from src.paper_selector import find_and_download_paper
 from src.script_generator import generate_script_from_paper
 from src.settings import Settings, get_settings
 
@@ -20,12 +22,6 @@ def podcast_generation_pipeline(settings: Settings) -> None:
     """Orchestrates the full podcast generation pipeline."""
     logger.info("Starting podcast generation pipeline.")
 
-    paper_path = Path("data/papers/2506.03095v1.pdf")
-
-    if not paper_path.exists():
-        logger.critical("Paper not found at %s. Ensure the path is correct and the file exists.", paper_path)
-        sys.exit(1)
-
     background_image_path = Path("assets", "background.png")
     if not background_image_path.exists():
         logger.critical("Background image not found at %s. Ensure the path is correct and the file exists.", background_image_path)
@@ -35,6 +31,14 @@ def podcast_generation_pipeline(settings: Settings) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        yesterday = datetime.now(tz=UTC) - timedelta(days=2)
+        find_and_download_paper(date=yesterday, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
+        paper_path = data_dir / "paper.pdf"
+
+        if not paper_path.exists():
+            logger.critical("Paper not found at %s. Ensure the path is correct and the file exists.", paper_path)
+            sys.exit(1)
+
         # 1. Generate podcast script
         logger.info("Generating podcast script from paper: %s", paper_path)
         podcast_script = generate_script_from_paper(paper_path=paper_path, script_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
