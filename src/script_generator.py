@@ -20,9 +20,11 @@ def generate_script_from_paper(paper_path: Path, script_generator_model: str, ge
     Requirements:
     - Accessible to a wide general audience
     - Explain all concepts and define technical terms simply
-    - Ensure the podcast is fun and engaging for listeners and in conversational tone
+    - Ensure the podcast is fun and engaging for listeners
+    - Friendly, conversational tone
     - Do not give the two speakers names and they should not refer to each other by name
     - The script should include speach from the two speakers only, do not include any stage directions
+    - Script should include "Welcome to Daily Papers"
 
     Output: Transcript only.
     """
