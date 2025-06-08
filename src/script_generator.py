@@ -12,15 +12,18 @@ def generate_script_from_paper(paper_path: Path, script_generator_model: str, ge
     logger.info("Starting script generation from paper: %s using model: %s", paper_path.name, script_generator_model)
 
     prompt = """
-    Write a podcast script for this paper.
-    The podcast should be around 8-10 minutes.
-    The transcript should be in the following format, alternating between 'Speaker 1' and 'Speaker 2':
-    Speaker 1: We're seeing a noticeable shift in consumer preferences across several sectors. What seems to be driving this change?
-    Speaker 2: It appears to be a combination of factors, including greater awareness of sustainability issues and a growing demand for personalized experiences.
-    Output transcript only.
-    Ensure the podcast is fun and engaging for viewers.
+    Write a 6-10 minute podcast script for this paper.
     The name of the podcast is 'Daily Papers'.
-    Make sure you explain all the concepts and make the podcast accessible to a wide audience.
+
+    Format: Alternating dialogue between speakers labelled as 'Speaker 1' and 'Speaker 2' only.
+
+    Requirements:
+    - Accessible to a wide general audience
+    - Explain all concepts and define technical terms simply
+    - Ensure the podcast is fun and engaging for listeners and in conversational tone
+    - Do not give the two speakers names and they should not refer to each other by name
+
+    Output: Transcript only.
     """
 
     client = genai.Client(api_key=gemini_api_key)

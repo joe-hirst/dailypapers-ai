@@ -97,7 +97,7 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
         msg = "LLM returned empty response"
         raise ValueError(msg)
 
-    pdf_url_pattern = r"https?://arxiv\.org/pdf/[\d.]+(?:v\d+)?\.pdf"
+    pdf_url_pattern = r"http?://arxiv\.org/pdf/[\d.]+(?:v\d+)?"
     match = re.search(pdf_url_pattern, response.text)
     if not match:
         logger.warning("No valid PDF URL found in response: %s", response)
