@@ -38,7 +38,6 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         paper = find_and_download_paper(
             date=target_date, output_paper_path=paper_path, paper_selector_model=settings.gemini_paper_selector_model, gemini_api_key=settings.gemini_api_key
         )
-
         if not paper_path.exists():
             logger.critical("Paper not found. Ensure the path is correct and the file exists.")
             sys.exit(1)
@@ -48,10 +47,6 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         podcast_script = generate_script_from_paper(
             paper_path=paper_path, script_generator_model=settings.gemini_script_generator_model, gemini_api_key=settings.gemini_api_key
         )
-
-        if not podcast_script:
-            logger.critical("Failed to generate podcast script. Script content was empty.")
-            sys.exit(1)
         # Save script for reference
         script_path = data_dir / "podcast_script.txt"
         script_path.write_text(podcast_script)
@@ -63,7 +58,6 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         generate_audio_from_script(
             podcast_script=podcast_script, output_wav_path=audio_wav_path, tts_model=settings.gemini_tts_model, gemini_api_key=settings.gemini_api_key
         )
-
         if not audio_wav_path.exists():
             logger.critical("Audio generation failed: Output file does not exist.")
             sys.exit(1)
@@ -73,11 +67,14 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         logger.info("Composing the final podcast video.")
         video_mp4_path = data_dir / "podcast.mp4"
         compose_final_podcast_video(input_wav_path=audio_wav_path, output_mp4_path=video_mp4_path, background_image=background_image_path)
+        if not video_mp4_path.exists():
+            logger.critical("Video generation failed: Output file does not exist.")
+            sys.exit(1)
         logger.info("Podcast video composed successfully.")
 
         # 5. Upload video to YouTube
         logger.info("Uploading video")
-        upload_video_to_youtube(video_path=Path("data/podcast.mp4"), paper=paper, settings=settings)
+        upload_video_to_youtube(video_path=video_mp4_path, paper=paper, settings=settings)
 
     except Exception:
         logger.exception("An unexpected error occurred during the podcast generation pipeline")
