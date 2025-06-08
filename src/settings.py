@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO", alias="LOG_LEVEL")
 
     gemini_api_key: str = Field(alias="GEMINI_API_KEY")
-    script_model: str = Field(alias="GEMINI_SCRIPT_MODEL")
-    tts_model: str = Field(alias="GEMINI_TTS_MODEL")
+    gemini_paper_selector_model: str = Field(alias="GEMINI_PAPER_SELECTOR_MODEL")
+    gemini_script_generator_model: str = Field(alias="GEMINI_SCRIPT_GENERATOR_MODEL")
+    gemini_tts_model: str = Field(alias="GEMINI_TTS_MODEL")
 
     paper_date: str = Field(default_factory=lambda: (datetime.now(tz=UTC) - timedelta(days=3)).strftime("%Y-%m-%d"), alias="PAPER_DATE")
 

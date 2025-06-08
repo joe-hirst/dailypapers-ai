@@ -35,7 +35,9 @@ def podcast_generation_pipeline(settings: Settings) -> None:
     try:
         # 1. Select best paper for day
         paper_path = data_dir / "paper.pdf"
-        paper = find_and_download_paper(date=target_date, output_paper_path=paper_path, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
+        paper = find_and_download_paper(
+            date=target_date, output_paper_path=paper_path, paper_selector_model=settings.gemini_paper_selector_model, gemini_api_key=settings.gemini_api_key
+        )
 
         if not paper or not paper_path.exists():
             logger.critical("Paper not found. Ensure the path is correct and the file exists.")
@@ -43,7 +45,9 @@ def podcast_generation_pipeline(settings: Settings) -> None:
 
         # 2. Generate podcast script
         logger.info("Generating podcast script from paper: %s", paper_path)
-        podcast_script = generate_script_from_paper(paper_path=paper_path, script_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
+        podcast_script = generate_script_from_paper(
+            paper_path=paper_path, script_generator_model=settings.gemini_script_generator_model, gemini_api_key=settings.gemini_api_key
+        )
 
         if not podcast_script:
             logger.critical("Failed to generate podcast script. Script content was empty.")
@@ -57,7 +61,7 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         logger.info("Generating audio from the podcast script.")
         audio_wav_path = data_dir / "podcast.wav"
         generate_audio_from_script(
-            podcast_script=podcast_script, output_wav_path=audio_wav_path, tts_model=settings.tts_model, gemini_api_key=settings.gemini_api_key
+            podcast_script=podcast_script, output_wav_path=audio_wav_path, tts_model=settings.gemini_tts_model, gemini_api_key=settings.gemini_api_key
         )
 
         if not audio_wav_path.exists():

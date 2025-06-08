@@ -10,7 +10,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 
-def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> arxiv.Result | None:
+def find_and_download_paper(date: date, output_paper_path: Path, paper_selector_model: str, gemini_api_key: str) -> arxiv.Result | None:
     """Find best paper for date and download it to specified path."""
     logger.info("Starting paper selection and download process for %s", date.isoformat())
 
@@ -21,7 +21,7 @@ def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: s
         return None
 
     # 2. Select the best paper
-    best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, gemini_model=gemini_model, gemini_api_key=gemini_api_key)
+    best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, paper_selector_model=paper_selector_model, gemini_api_key=gemini_api_key)
     if not best_paper:
         logger.error("Failed to select best paper from available candidates")
         return None
@@ -63,9 +63,9 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
     ]
 
 
-def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str, gemini_api_key: str) -> str | None:
+def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_model: str, gemini_api_key: str) -> str | None:
     """Select best paper for podcast from list of abstracts using LLM."""
-    logger.info("Selecting best paper from %d candidates using model: %s", len(papers_with_abstracts), gemini_model)
+    logger.info("Selecting best paper from %d candidates using model: %s", len(papers_with_abstracts), paper_selector_model)
 
     prompt = f"""
     Take a look at the following papers. Select the ""best"" one to be discussed on the Daily Papers podcast.
@@ -89,7 +89,7 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str
         response_mime_type="text/plain",
     )
     response = client.models.generate_content(
-        model=gemini_model,
+        model=paper_selector_model,
         contents=contents,
         config=generate_content_config,
     )
