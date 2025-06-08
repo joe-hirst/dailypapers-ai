@@ -10,7 +10,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 
-def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> None:
+def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: str, gemini_api_key: str) -> arxiv.Result | None:
     """Find best paper for date and download it to specified path."""
     logger.info("Starting paper selection and download process for %s", date.isoformat())
 
@@ -18,16 +18,16 @@ def find_and_download_paper(date: date, output_paper_path: Path, gemini_model: s
     papers_with_abstracts = get_abstracts_for_day(date)
     if not papers_with_abstracts:
         logger.warning("No papers found for date %s, skipping paper selection", date.isoformat())
-        return
+        return None
 
     # 2. Select the best paper
     best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, gemini_model=gemini_model, gemini_api_key=gemini_api_key)
     if not best_paper:
         logger.error("Failed to select best paper from available candidates")
-        return
+        return None
 
     # 3. Download the best paper
-    download_arxiv_pdf_from_url(pdf_url=best_paper, output_paper_path=output_paper_path)
+    return download_arxiv_pdf_from_url(pdf_url=best_paper, output_paper_path=output_paper_path)
 
 
 def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str] | None:
@@ -96,7 +96,7 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], gemini_model: str
     return response.text
 
 
-def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
+def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> arxiv.Result | None:
     """Download arXiv paper PDF from URL to specified path."""
     logger.info("Attempting to download paper from URL: %s", pdf_url)
 
@@ -104,7 +104,7 @@ def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
     match = re.search(r"arxiv\.org/pdf/(\d{4}\.\d{5}(?:v\d+)?)", pdf_url)
     if not match:
         logger.warning("Could not extract arXiv ID from URL: %s", pdf_url)
-        return
+        return None
 
     arxiv_id = match.group(1)
     logger.info("Extracted arXiv ID: %s", arxiv_id)
@@ -117,9 +117,9 @@ def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> None:
         if paper:
             filepath = paper.download_pdf(dirpath=str(output_paper_path.parent), filename=output_paper_path.name)
             logger.info("Downloaded %s to %s", paper.title, filepath)
-            logger.info("Paper was submitted on %s", paper.published.date)
-        else:
-            logger.error("No paper found for arXiv ID: %s", arxiv_id)
+            logger.info("Paper was submitted on %s", paper.published.date())
+            return paper
+        logger.error("No paper found for arXiv ID: %s", arxiv_id)
 
     except Exception:
         logger.exception("Failed to download paper from arXiv ID: %s", arxiv_id)

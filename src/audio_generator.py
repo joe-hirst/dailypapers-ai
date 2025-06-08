@@ -42,7 +42,8 @@ def generate_audio_from_script(podcast_script: str, output_wav_path: Path, tts_m
         full_audio_data, received_mime_type = _process_audio_stream(tts_model, contents, generate_content_config, gemini_api_key)
 
         if not full_audio_data:
-            return
+            msg = "No audio data was generated from the TTS model"
+            raise RuntimeError(msg)  # noqa: TRY301
 
         if received_mime_type and not received_mime_type.lower().startswith("audio/wav"):
             full_audio_data = _convert_to_wav(full_audio_data, received_mime_type)
@@ -50,10 +51,13 @@ def generate_audio_from_script(podcast_script: str, output_wav_path: Path, tts_m
         elif not received_mime_type:
             logger.warning("No MIME type provided for audio data. Assuming default and attempting WAV conversion.")
             full_audio_data = _convert_to_wav(full_audio_data, "audio/L16;rate=24000")
-    except Exception:
-        logger.exception("Error during audio generation pipeline.")
-    else:
+
         _save_binary_data(output_file_path=output_wav_path, data=full_audio_data)
+        logger.info("Audio generation completed successfully")
+
+    except Exception:
+        logger.exception("Error during audio generation")
+        raise
 
 
 def _process_audio_stream(tts_model: str, contents: list[types.Content], config: types.GenerateContentConfig, gemini_api_key: str) -> tuple[bytes, str | None]:
