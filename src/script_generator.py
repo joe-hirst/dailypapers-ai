@@ -7,7 +7,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 
-def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_key: str) -> str | None:
+def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_key: str) -> str:
     """Generate podcast script from a research paper using a Gemini model."""
     logger.info("Starting script generation from paper: %s using model: %s", paper_path.name, script_model)
 
@@ -48,17 +48,19 @@ def generate_script_from_paper(paper_path: Path, script_model: str, gemini_api_k
 
         podcast_script_raw = response.text
         if podcast_script_raw is None:
-            logger.warning("Gemini model returned None for response text for paper: %s", paper_path.name)
-            return None
+            msg = f"Gemini model returned None for response text for paper: {paper_path.name}"
+            logger.warning(msg)
+            raise RuntimeError(msg)  # noqa: TRY301
 
         podcast_script = podcast_script_raw.strip()
         if not podcast_script:
-            logger.warning("Gemini model returned an empty script for paper: %s", paper_path.name)
-            return None
+            msg = f"Gemini model returned an empty script for paper: {paper_path.name}"
+            logger.warning(msg)
+            raise RuntimeError(msg)  # noqa: TRY301
 
     except Exception:
-        logger.exception("Failed to generate script for paper '%s'. An error occurred.", paper_path.name)
-        return None
+        logger.exception("Failed to generate script for paper '%s'", paper_path.name)
+        raise
     else:
         logger.info("Script generation complete for paper: %s (%d characters)", paper_path.name, len(podcast_script))
         return podcast_script
