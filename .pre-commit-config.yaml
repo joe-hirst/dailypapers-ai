@@ -5,10 +5,14 @@ repos:
       - id: ruff
       - id: ruff-format
 
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.389
+  - repo: local
     hooks:
       - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        types: [python]
+        pass_filenames: false
 
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: 2.2.4

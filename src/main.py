@@ -7,6 +7,7 @@ from src.media_composer import compose_final_podcast_video
 from src.paper_selector import find_and_download_paper
 from src.script_generator import generate_script_from_paper
 from src.settings import Settings, get_settings
+from src.youtube_uploader import upload_video_to_youtube
 
 settings = get_settings()
 
@@ -34,10 +35,10 @@ def podcast_generation_pipeline(settings: Settings) -> None:
     try:
         # 1. Select best paper for day
         paper_path = data_dir / "paper.pdf"
-        find_and_download_paper(date=target_date, output_paper_path=paper_path, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
+        paper = find_and_download_paper(date=target_date, output_paper_path=paper_path, gemini_model=settings.script_model, gemini_api_key=settings.gemini_api_key)
 
-        if not paper_path.exists():
-            logger.critical("Paper not found at %s. Ensure the path is correct and the file exists.", paper_path)
+        if not paper or not paper_path.exists():
+            logger.critical("Paper not found. Ensure the path is correct and the file exists.")
             sys.exit(1)
 
         # 2. Generate podcast script
@@ -69,6 +70,10 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         video_mp4_path = data_dir / "podcast.mp4"
         compose_final_podcast_video(input_wav_path=audio_wav_path, output_mp4_path=video_mp4_path, background_image=background_image_path)
         logger.info("Podcast video composed successfully.")
+
+        # 5. Upload video to YouTube
+        logger.info("Uploading video")
+        upload_video_to_youtube(video_path=Path("data/podcast.mp4"), paper=paper, settings=settings)
 
     except Exception:
         logger.exception("An unexpected error occurred during the podcast generation pipeline")

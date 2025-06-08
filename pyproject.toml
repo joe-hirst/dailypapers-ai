@@ -1,26 +1,30 @@
 [project]
 name = "daily-papers-podcast"
 version = "0.1.0"
-description = "Automatically generate podcasts about Arxiv papers with Google Gemini and Text-to-Speach "
+description = "Automatically generate podcasts about Arxiv papers with Google Gemini and Text-to-Speach"
 readme = "README.md"
 requires-python = ">=3.13"
+classifiers = [ "Programming Language :: Python :: 3 :: Only" ]
 dependencies = [
-    "arxiv>=2.2.0",
-    "google-genai>=1.18.0",
-    "librosa>=0.11.0",
-    "pydantic>=2.11.5",
-    "pydantic-settings>=2.9.1",
-    "soundfile>=0.13.1",
+  "arxiv>=2.2",
+  "google-api-python-client>=2.171",
+  "google-auth>=2.40.2",
+  "google-genai>=1.18",
+  "pydantic>=2.11.5",
+  "pydantic-settings>=2.9.1",
 ]
-
-[dependency-groups]
-dev = ["pyright>=1.1.401", "ruff>=0.11.12"]
 
 [tool.ruff]
 target-version = "py313"
 line-length = 165
 fix = true
 
-[tool.ruff.lint]
-select = ["ALL"]
-ignore = ["COM812", "D100", "D104", "D203", "D212"]
+lint.select = [ "ALL" ]
+lint.ignore = [ "COM812", "D100", "D104", "D203", "D212" ]
+
+[dependency-groups]
+dev = [
+  "pre-commit>=4.2.0",
+  "pyright>=1.1.401",
+  "ruff>=0.11.12",
+]
