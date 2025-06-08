@@ -22,6 +22,7 @@ def generate_script_from_paper(paper_path: Path, script_generator_model: str, ge
     - Explain all concepts and define technical terms simply
     - Ensure the podcast is fun and engaging for listeners and in conversational tone
     - Do not give the two speakers names and they should not refer to each other by name
+    - The script should include speach from the two speakers only, do not include any stage directions
 
     Output: Transcript only.
     """
