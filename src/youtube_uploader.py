@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import arxiv
@@ -27,14 +28,16 @@ def upload_video_to_youtube(
     paper_title = paper.title.strip()
     max_chars = 85
     if len(paper_title) >= max_chars:
-        paper_title = f"{paper_title[:80]}..."
+        paper_title = f"{paper_title[:80].strip()}..."
     title = f"{paper_title} (AI Podcast)".strip()
 
     description = f"""
-Daily Papers podcast for {paper.published.date()}
+Daily Papers podcast for {format_date(datetime.now(tz=UTC))}
 
 Today's paper: {paper.title.strip()}
+
 Paper URL: {paper.pdf_url.strip() if paper.pdf_url else "URL not availavle"}
+
 Paper Authors: {", ".join([author.name for author in paper.authors])}
 
 Daily Papers is an AI-generated podcast discussing the latest research papers in artificial intelligence and machine learning.
@@ -117,3 +120,14 @@ def get_youtube_credentials(settings: Settings) -> Credentials | None:
 
     logger.info("Authenticated")
     return creds
+
+
+def format_date(dt: datetime) -> str:
+    """Format datetime as 'Xth Month YYYY' (e.g., '7th June 2025')."""
+    day = dt.day
+    suffix = (
+        "th"
+        if 10 <= day % 100 <= 20  # noqa: PLR2004
+        else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    )
+    return f"{day}{suffix} {dt.strftime('%B %Y')}"
