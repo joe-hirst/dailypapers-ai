@@ -39,7 +39,7 @@ def podcast_generation_pipeline(settings: Settings) -> None:
             date=target_date, output_paper_path=paper_path, paper_selector_model=settings.gemini_paper_selector_model, gemini_api_key=settings.gemini_api_key
         )
 
-        if not paper or not paper_path.exists():
+        if not paper_path.exists():
             logger.critical("Paper not found. Ensure the path is correct and the file exists.")
             sys.exit(1)
 
