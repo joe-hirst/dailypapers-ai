@@ -1,5 +1,4 @@
 import logging
-import re
 from datetime import date
 from pathlib import Path
 
@@ -12,18 +11,32 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 
-def find_and_download_paper(date: date, output_paper_path: Path, paper_selector_model: str, gemini_api_key: str) -> arxiv.Result:
+class Paper(BaseModel):
+    title: str
+    reason_for_choice: str
+    arxiv_id: str
+
+
+def find_and_download_paper(target_date: date, output_paper_path: Path, paper_selector_model: str, gemini_api_key: str) -> arxiv.Result:
     """Find best paper for date and download it to specified path."""
-    logger.info("Starting paper selection and download process for %s", date.isoformat())
+    logger.info("Starting paper selection and download process for %s", target_date.isoformat())
 
     # 1. Get list of abstracts uploaded to Arxiv
-    papers_with_abstracts = get_abstracts_for_day(date)
+    papers_with_abstracts = get_abstracts_for_day(target_date)
 
     # 2. Select the best paper
-    best_paper = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, paper_selector_model=paper_selector_model, gemini_api_key=gemini_api_key)
+    best_paper_id = select_paper_for_podcast(papers_with_abstracts=papers_with_abstracts, paper_selector_model=paper_selector_model, gemini_api_key=gemini_api_key)
+
+    # 4. Get arXiv object
+    best_paper_result = get_arxiv_paper(best_paper_id)
 
     # 3. Download the best paper
-    return download_arxiv_pdf_from_url(pdf_url=best_paper, output_paper_path=output_paper_path)
+    if not best_paper_result.pdf_url:
+        logger.critical("Selected paper has no PDF URL available")
+        raise ValueError
+    download_file(url=best_paper_result.pdf_url, output_path=output_paper_path)
+
+    return best_paper_result
 
 
 def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str]:
@@ -34,16 +47,13 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
     # Query for AI papers (cat:cs.AI) submitted on the target date
     primary_ai_categories = ["cs.AI", "cs.LG"]
     category_query = " OR ".join([f"cat:{cat}" for cat in primary_ai_categories])
-
     search_query = f"({category_query}) AND submittedDate:[{target_date.strftime('%Y%m%d')}000000 TO {target_date.strftime('%Y%m%d')}235959]"
-
     search = arxiv.Search(
         query=search_query,
         max_results=max_results,
         sort_by=arxiv.SortCriterion.SubmittedDate,
         sort_order=arxiv.SortOrder.Descending,
     )
-
     results = list(client.results(search))
     if not results:
         logger.warning("No AI papers found for %s", target_date.isoformat())
@@ -55,8 +65,8 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
         f"""
         Title: {paper.title}
         Authors: {", ".join([author.name for author in paper.authors])}
-        PDF URL: {paper.pdf_url}
-        Abstract: {paper.summary}
+        arXiv ID: {paper.get_short_id()}
+        Summary: {paper.summary}
         ----------------------------------------
         """
         for paper in results
@@ -67,11 +77,6 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
     """Select best paper for podcast from list of abstracts using LLM."""
     logger.info("Selecting best paper from %d candidates using model: %s", len(papers_with_abstracts), paper_selector_model)
 
-    class Paper(BaseModel):
-        title: str
-        reason_for_choice: str
-        pdf_link: str
-
     prompt = f"""
     Select the most impactful paper to be discussed on the Daily Papers podcast.
     Pick a paper based on the following criteria:
@@ -79,8 +84,6 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
     - Broad appeal to a large audience
     - Potential for virality
     - Credible and established authors/institutions
-
-    Return the full pdf_url only.
 
     <papers>
     {"".join(papers_with_abstracts)}
@@ -104,41 +107,28 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
         msg = "LLM returned invalid response"
         raise TypeError(msg)
 
-    return result.pdf_link
+    return result.arxiv_id
 
 
-def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> arxiv.Result:
-    """Download arXiv paper PDF from URL to specified path."""
-    logger.info("Attempting to download paper from URL: %s", pdf_url)
+def download_file(url: str, output_path: Path) -> None:
+    """Download file from URL to specified path."""
+    response = httpx.get(url)
+    response.raise_for_status()
+    output_path.write_bytes(response.content)
 
-    # 1. Extract the arXiv ID from the PDF URL
-    match = re.search(r"arxiv\.org/pdf/(\d{4}\.\d{5}(?:v\d+)?)", pdf_url)
-    if not match:
-        logger.warning("Could not extract arXiv ID from URL: %s", pdf_url)
-        msg = "Could not find pdf to download"
-        raise ValueError(msg)
+    # Validate PDF
+    if not output_path.read_bytes()[:4].startswith(b"%PDF"):
+        output_path.unlink()
+        logger.critical("Downloaded file is not a valid PDF")
+        raise ValueError
 
-    arxiv_id = match.group(1)
-    logger.info("Extracted arXiv ID: %s", arxiv_id)
 
-    try:
-        client = arxiv.Client()
-        search = arxiv.Search(id_list=[arxiv_id])
-        paper = next(client.results(search), None)
-        if paper:
-            # Download using httpx
-            response = httpx.get(pdf_url)
-            response.raise_for_status()
-            output_paper_path.write_bytes(response.content)
-
-            logger.info("Downloaded %s to %s", paper.title, output_paper_path)
-            logger.info("Paper was submitted on %s", paper.published.date())
-            return paper
-        logger.critical("Could not find paper in arXiv ID: %s", arxiv_id)
-        msg = f"Could not find paper in arXiv ID: {arxiv_id}"
-        raise ValueError(msg)  # noqa: TRY301
-
-    except Exception as e:
-        logger.exception("Failed to download paper from arXiv ID: %s", arxiv_id)
-        msg = f"Failed to download paper from arXiv ID: {arxiv_id}"
-        raise ValueError(msg) from e
+def get_arxiv_paper(arxiv_id: str) -> arxiv.Result:
+    """Get arxiv paper object from ID."""
+    client = arxiv.Client()
+    search = arxiv.Search(id_list=[arxiv_id])
+    paper = next(client.results(search), None)
+    if not paper:
+        logger.critical("Could not find paper with arXiv ID: %s", arxiv_id)
+        raise ValueError
+    return paper

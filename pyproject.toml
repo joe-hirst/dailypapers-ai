@@ -20,11 +20,7 @@ line-length = 165
 fix = true
 
 lint.select = [ "ALL" ]
-lint.ignore = [ "COM812", "D100", "D104", "D203", "D212" ]
+lint.ignore = [ "COM812", "D100", "D101", "D104", "D203", "D212" ]
 
 [dependency-groups]
-dev = [
-  "pre-commit>=4.2.0",
-  "pyright>=1.1.401",
-  "ruff>=0.11.12",
-]
+dev = [ "pre-commit>=4.2.0", "pyright>=1.1.401", "ruff>=0.11.12" ]
