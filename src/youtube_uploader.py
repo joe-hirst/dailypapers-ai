@@ -40,6 +40,7 @@ Paper URL: {paper.pdf_url.strip() if paper.pdf_url else "URL not availavle"}
 
 Paper Authors: {", ".join([author.name for author in paper.authors])}
 
+
 Daily Papers is an AI-generated podcast discussing the latest research papers in artificial intelligence and machine learning.
 
 #AI #MachineLearning #Research #Podcast #DailyPapers

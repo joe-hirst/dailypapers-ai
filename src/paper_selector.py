@@ -30,7 +30,10 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
     client = arxiv.Client()
 
     # Query for AI papers (cat:cs.AI) submitted on the target date
-    search_query = f"cat:cs.AI AND submittedDate:[{target_date.strftime('%Y%m%d')}000000 TO {target_date.strftime('%Y%m%d')}235959]"
+    primary_ai_categories = ["cs.AI", "cs.LG"]
+    category_query = " OR ".join([f"cat:{cat}" for cat in primary_ai_categories])
+
+    search_query = f"({category_query}) AND submittedDate:[{target_date.strftime('%Y%m%d')}000000 TO {target_date.strftime('%Y%m%d')}235959]"
 
     search = arxiv.Search(
         query=search_query,
@@ -68,6 +71,7 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
     - Interesting results in Artificial Intelligence
     - Broad appeal to a large audience
     - Potential for virality
+    - Credible and established authors/institutions
 
     Return the full pdf_url only.
 
@@ -75,6 +79,7 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
     {"".join(papers_with_abstracts)}
     </papers>
     """
+    logger.info("Papers with summaries have %s words", len(prompt.split()))
 
     client = genai.Client(api_key=gemini_api_key)
     contents = [
