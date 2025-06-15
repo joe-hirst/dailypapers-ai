@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 
 import arxiv
+import httpx
 from google import genai
 from google.genai import types
 
@@ -126,14 +127,17 @@ def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> arxiv.
     arxiv_id = match.group(1)
     logger.info("Extracted arXiv ID: %s", arxiv_id)
 
-    # 2. Use the arxiv SDK to search for that ID
     try:
         client = arxiv.Client()
         search = arxiv.Search(id_list=[arxiv_id])
         paper = next(client.results(search), None)
         if paper:
-            filepath = paper.download_pdf(dirpath=str(output_paper_path.parent), filename=output_paper_path.name)
-            logger.info("Downloaded %s to %s", paper.title, filepath)
+            # Download using httpx
+            response = httpx.get(pdf_url)
+            response.raise_for_status()
+            output_paper_path.write_bytes(response.content)
+
+            logger.info("Downloaded %s to %s", paper.title, output_paper_path)
             logger.info("Paper was submitted on %s", paper.published.date())
             return paper
         logger.critical("Could not find paper in arXiv ID: %s", arxiv_id)
