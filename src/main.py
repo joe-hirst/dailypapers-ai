@@ -36,7 +36,7 @@ def podcast_generation_pipeline(settings: Settings) -> None:
         # 1. Select best paper for day
         paper_path = data_dir / "paper.pdf"
         paper = find_and_download_paper(
-            date=target_date, output_paper_path=paper_path, paper_selector_model=settings.gemini_paper_selector_model, gemini_api_key=settings.gemini_api_key
+            target_date=target_date, output_paper_path=paper_path, paper_selector_model=settings.gemini_paper_selector_model, gemini_api_key=settings.gemini_api_key
         )
         if not paper_path.exists():
             logger.critical("Paper not found. Ensure the path is correct and the file exists.")
