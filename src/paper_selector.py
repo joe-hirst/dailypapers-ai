@@ -32,8 +32,8 @@ def find_and_download_paper(target_date: date, output_paper_path: Path, paper_se
 
     # 3. Download the best paper
     if not best_paper_result.pdf_url:
-        logger.critical("Selected paper has no PDF URL available")
-        raise ValueError
+        msg = "Selected paper has no PDF URL available"
+        raise ValueError(msg)
     download_file(url=best_paper_result.pdf_url, output_path=output_paper_path)
 
     return best_paper_result
@@ -56,8 +56,7 @@ def get_abstracts_for_day(target_date: date, max_results: int = 500) -> list[str
     )
     results = list(client.results(search))
     if not results:
-        logger.warning("No AI papers found for %s", target_date.isoformat())
-        msg = "No AI papers returned from Arxiv"
+        msg = f"No AI papers found for %s {target_date.isoformat()}"
         raise ValueError(msg)
 
     logger.info("Found %d AI papers for %s", len(results), target_date.isoformat())  # Add this
@@ -119,8 +118,8 @@ def download_file(url: str, output_path: Path) -> None:
     # Validate PDF
     if not output_path.read_bytes()[:4].startswith(b"%PDF"):
         output_path.unlink()
-        logger.critical("Downloaded file is not a valid PDF")
-        raise ValueError
+        msg = "Downloaded file is not a valid PDF"
+        raise ValueError(msg)
 
 
 def get_arxiv_paper(arxiv_id: str) -> arxiv.Result:
@@ -129,6 +128,6 @@ def get_arxiv_paper(arxiv_id: str) -> arxiv.Result:
     search = arxiv.Search(id_list=[arxiv_id])
     paper = next(client.results(search), None)
     if not paper:
-        logger.critical("Could not find paper with arXiv ID: %s", arxiv_id)
-        raise ValueError
+        msg = f"Could not find paper with arXiv ID: {arxiv_id}"
+        raise ValueError(msg)
     return paper
