@@ -7,6 +7,7 @@ import arxiv
 import httpx
 from google import genai
 from google.genai import types
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,11 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
     """Select best paper for podcast from list of abstracts using LLM."""
     logger.info("Selecting best paper from %d candidates using model: %s", len(papers_with_abstracts), paper_selector_model)
 
+    class Paper(BaseModel):
+        title: str
+        reason_for_choice: str
+        pdf_link: str
+
     prompt = f"""
     Select the most impactful paper to be discussed on the Daily Papers podcast.
     Pick a paper based on the following criteria:
@@ -83,34 +89,22 @@ def select_paper_for_podcast(papers_with_abstracts: list[str], paper_selector_mo
     logger.info("Papers with summaries have %s words", len(prompt.split()))
 
     client = genai.Client(api_key=gemini_api_key)
-    contents = [
-        types.Content(
-            role="user",
-            parts=[
-                types.Part.from_text(text=prompt),
-            ],
-        ),
-    ]
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
     generate_content_config = types.GenerateContentConfig(
-        response_mime_type="text/plain",
+        response_mime_type="application/json",
+        response_schema=Paper,
     )
     response = client.models.generate_content(
         model=paper_selector_model,
         contents=contents,
         config=generate_content_config,
     )
-    if not response.text:
-        msg = "LLM returned empty response"
-        raise ValueError(msg)
+    result = response.parsed
+    if not isinstance(result, Paper):
+        msg = "LLM returned invalid response"
+        raise TypeError(msg)
 
-    pdf_url_pattern = r"http?://arxiv\.org/pdf/[\d.]+(?:v\d+)?"
-    match = re.search(pdf_url_pattern, response.text)
-    if not match:
-        logger.warning("No valid PDF URL found in response: %s", response)
-        msg = f"No valid PDF URL found in response: {response.text}"
-        raise ValueError(msg)
-
-    return match.group(0)
+    return result.pdf_link
 
 
 def download_arxiv_pdf_from_url(pdf_url: str, output_paper_path: Path) -> arxiv.Result:
